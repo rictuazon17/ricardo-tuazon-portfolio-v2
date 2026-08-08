@@ -1,94 +1,94 @@
-const CACHE_NAME = "ricardo-portfolio-v2";
+const CACHE_VERSION = "v3";
+const CACHE_NAME = `ricardo-portfolio-${CACHE_VERSION}`;
 
-const FILES_TO_CACHE = [
+const CORE_ASSETS = [
   "/",
   "/index.html",
+  "/style.css",
+  "/script.js",
   "/manifest.json",
   "/profile.jpg",
-  "/Ricardo-Tuazon-Jr.pdf",
-  "/Recommendation%20Letter.pdf",
   "/icons/icon-192.png",
   "/icons/icon-512.png"
 ];
 
-self.addEventListener("install", function(event) {
+const OPTIONAL_ASSETS = [
+  "/Ricardo-Tuazon-Jr.pdf",
+  "/Recommendation%20Letter.pdf"
+];
+
+self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(function(cache) {
-        return cache.addAll(FILES_TO_CACHE);
+      .then(async cache => {
+        await Promise.all(
+          [...CORE_ASSETS, ...OPTIONAL_ASSETS].map(async url => {
+            try {
+              const response = await fetch(url, { cache: "no-cache" });
+              if (response.ok) await cache.put(url, response);
+            } catch {
+              // Optional assets may not exist yet; do not fail SW installation.
+            }
+          })
+        );
       })
-      .then(function() {
-        return self.skipWaiting();
-      })
-      .catch(function(err) {
-        console.log("Cache install failed:", err);
-      })
+      .then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener("activate", function(event) {
+self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(
+    caches.keys()
+      .then(keys => Promise.all(
         keys
-          .filter(function(key) {
-            return key !== CACHE_NAME;
-          })
-          .map(function(key) {
-            return caches.delete(key);
-          })
-      );
-    }).then(function() {
-      return self.clients.claim();
-    })
+          .filter(key => key.startsWith("ricardo-portfolio-") && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener("fetch", function(event) {
-  if (event.request.method !== "GET") return;
+function isNavigation(request) {
+  return request.mode === "navigate" ||
+    request.destination === "document" ||
+    new URL(request.url).pathname.endsWith(".html");
+}
 
-  var requestUrl = new URL(event.request.url);
+self.addEventListener("fetch", event => {
+  const request = event.request;
+  if (request.method !== "GET") return;
 
-  // Network-first for HTML navigation
-  if (requestUrl.pathname === "/" || requestUrl.pathname.endsWith(".html")) {
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (isNavigation(request)) {
     event.respondWith(
-      fetch(event.request)
-        .then(function(response) {
-          var responseClone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, responseClone);
-          });
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
           return response;
         })
-        .catch(function() {
-          return caches.match(event.request).then(function(cached) {
-            return cached || caches.match("/index.html");
-          });
-        })
+        .catch(() => caches.match(request).then(cached => cached || caches.match("/")))
     );
     return;
   }
 
-  // Cache-first for static assets
   event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      if (cached) {
-        return cached;
-      }
-      return fetch(event.request)
-        .then(function(response) {
-          if (!response || response.status !== 200 || response.type !== "basic") {
-            return response;
+    caches.match(request).then(cached => {
+      const refresh = fetch(request)
+        .then(response => {
+          if (response.ok && response.type === "basic") {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
           }
-          var responseClone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, responseClone);
-          });
           return response;
         })
-        .catch(function() {
-          return cached;
-        });
+        .catch(() => cached);
+
+      return cached || refresh;
     })
   );
 });

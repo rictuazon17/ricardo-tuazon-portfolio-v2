@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /private/
+Disallow: /admin/
+
+Sitemap: https://ricardo-tuazon-portfolio-v2.cortex0117.workers.dev/sitemap.xml
