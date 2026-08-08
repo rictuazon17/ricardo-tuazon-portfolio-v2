@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4-hotfix";
 const CACHE_NAME = `ricardo-portfolio-${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -6,6 +6,8 @@ const CORE_ASSETS = [
   "/index.html",
   "/style.css",
   "/script.js",
+  "/hotfix.css",
+  "/hotfix.js",
   "/manifest.json",
   "/profile.jpg",
   "/icons/icon-192.png",
@@ -26,9 +28,7 @@ self.addEventListener("install", event => {
             try {
               const response = await fetch(url, { cache: "no-cache" });
               if (response.ok) await cache.put(url, response);
-            } catch {
-              // Optional assets may not exist yet; do not fail SW installation.
-            }
+            } catch {}
           })
         );
       })
@@ -49,9 +49,34 @@ self.addEventListener("activate", event => {
 });
 
 function isNavigation(request) {
-  return request.mode === "navigate" ||
-    request.destination === "document" ||
-    new URL(request.url).pathname.endsWith(".html");
+  return request.mode === "navigate" || request.destination === "document";
+}
+
+async function injectHotfixes(response) {
+  if (!response || !response.ok) return response;
+  const type = response.headers.get("content-type") || "";
+  if (!type.includes("text/html")) return response;
+
+  const html = await response.text();
+  if (html.includes("/hotfix.css") && html.includes("/hotfix.js")) return new Response(html, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  });
+
+  const injected = html.replace(
+    /<\/head>/i,
+    '  <link rel="stylesheet" href="/hotfix.css?v=4"><script src="/hotfix.js?v=4" defer></script>\n</head>'
+  );
+
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.delete("content-length");
+  return new Response(injected, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
 }
 
 self.addEventListener("fetch", event => {
@@ -63,9 +88,10 @@ self.addEventListener("fetch", event => {
 
   if (isNavigation(request)) {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: "no-cache" })
+        .then(injectHotfixes)
         .then(response => {
-          if (response.ok) {
+          if (response && response.ok) {
             const copy = response.clone();
             caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
           }
@@ -78,7 +104,7 @@ self.addEventListener("fetch", event => {
 
   event.respondWith(
     caches.match(request).then(cached => {
-      const refresh = fetch(request)
+      const refresh = fetch(request, { cache: "no-cache" })
         .then(response => {
           if (response.ok && response.type === "basic") {
             const copy = response.clone();
@@ -87,7 +113,6 @@ self.addEventListener("fetch", event => {
           return response;
         })
         .catch(() => cached);
-
       return cached || refresh;
     })
   );
