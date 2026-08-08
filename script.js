@@ -6,41 +6,25 @@
 (() => {
   "use strict";
 
-  /* ---------------------------------------------------------
-     Utilities
-     --------------------------------------------------------- */
-
-  const $ = (selector, root = document) =>
-    root.querySelector(selector);
-
-  const $$ = (selector, root = document) =>
-    [...root.querySelectorAll(selector)];
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
   const prefersReducedMotion =
-    window.matchMedia &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  /* ---------------------------------------------------------
-     DOM Ready
-     --------------------------------------------------------- */
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
   document.addEventListener("DOMContentLoaded", () => {
     initTheme();
-    initScrollProgress();
     initHeader();
+    initScrollProgress();
     initNavigation();
+    initSmoothAnchors();
     initRevealAnimations();
     initCardGlow();
     initCounters();
     initBackground();
     initFloatingOrbs();
     initScanline();
-    initSmoothAnchors();
   });
-
-  /* =========================================================
-     THEME
-     ========================================================= */
 
   function initTheme() {
     const toggle =
@@ -48,529 +32,324 @@
       $('button[aria-label*="theme" i]') ||
       $('button[title*="theme" i]');
 
-    const storedTheme =
-      localStorage.getItem("portfolio-theme");
+    const saved = localStorage.getItem("portfolio-theme");
+    const systemLight =
+      window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false;
 
-    const preferredTheme =
-      storedTheme ||
-      (
-        window.matchMedia &&
-        window.matchMedia("(prefers-color-scheme: light)").matches
-          ? "light"
-          : "dark"
-      );
+    const applyTheme = (theme) => {
+      const safeTheme = theme === "light" ? "light" : "dark";
 
-    applyTheme(preferredTheme);
-
-    if (!toggle) return;
-
-    toggle.addEventListener("click", () => {
-      const current =
-        document.documentElement.dataset.theme || "dark";
-
-      applyTheme(current === "dark" ? "light" : "dark");
-    });
-
-    function applyTheme(theme) {
-      document.documentElement.dataset.theme = theme;
-
-      localStorage.setItem(
-        "portfolio-theme",
-        theme
-      );
+      document.documentElement.dataset.theme = safeTheme;
+      localStorage.setItem("portfolio-theme", safeTheme);
 
       if (toggle) {
         toggle.setAttribute(
           "aria-pressed",
-          theme === "light" ? "true" : "false"
+          safeTheme === "light" ? "true" : "false"
         );
       }
+    };
+
+    applyTheme(saved || (systemLight ? "light" : "dark"));
+
+    if (toggle) {
+      toggle.addEventListener("click", () => {
+        const current =
+          document.documentElement.dataset.theme === "light"
+            ? "light"
+            : "dark";
+
+        applyTheme(current === "dark" ? "light" : "dark");
+      });
     }
   }
 
-  /* =========================================================
-     HEADER
-     ========================================================= */
-
   function initHeader() {
-    const header = document.querySelector("header");
-
+    const header = $("header");
     if (!header) return;
 
     const update = () => {
-      header.classList.toggle(
-        "scrolled",
-        window.scrollY > 25
-      );
+      header.classList.toggle("scrolled", window.scrollY > 25);
     };
 
     update();
-
-    window.addEventListener(
-      "scroll",
-      update,
-      { passive: true }
-    );
+    window.addEventListener("scroll", update, { passive: true });
   }
-
-  /* =========================================================
-     SCROLL PROGRESS
-     ========================================================= */
 
   function initScrollProgress() {
-    const progress =
-      document.createElement("div");
+    let progress = $("#scroll-progress");
 
-    progress.id = "scroll-progress";
-
-    document.body.appendChild(progress);
+    if (!progress) {
+      progress = document.createElement("div");
+      progress.id = "scroll-progress";
+      document.body.appendChild(progress);
+    }
 
     const update = () => {
-      const scrollTop = window.scrollY;
-
-      const scrollHeight =
-        document.documentElement.scrollHeight -
-        window.innerHeight;
+      const maxScroll =
+        document.documentElement.scrollHeight - window.innerHeight;
 
       const percentage =
-        scrollHeight > 0
-          ? (scrollTop / scrollHeight) * 100
-          : 0;
+        maxScroll > 0 ? (window.scrollY / maxScroll) * 100 : 0;
 
       progress.style.width =
-        `${Math.min(100, Math.max(0, percentage))}%`;
+        Math.min(100, Math.max(0, percentage)) + "%";
     };
 
     update();
 
-    window.addEventListener(
-      "scroll",
-      update,
-      { passive: true }
-    );
-
-    window.addEventListener(
-      "resize",
-      update,
-      { passive: true }
-    );
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
   }
 
-  /* =========================================================
-     NAVIGATION
-     ========================================================= */
-
   function initNavigation() {
-    const links = $$(
-      'header a[href^="#"], nav a[href^="#"]'
-    );
+    const links = $$('header a[href^="#"], nav a[href^="#"]');
 
-    if (!links.length) return;
+    if (!links.length || !("IntersectionObserver" in window)) return;
 
-    const sections = links
-      .map(link => {
-        const id =
-          link.getAttribute("href");
+    const sections = [
+      ...new Set(
+        links
+          .map((link) => {
+            const id = link.getAttribute("href");
 
-        return id && id !== "#"
-          ? document.querySelector(id)
-          : null;
-      })
-      .filter(Boolean);
+            if (!id || id === "#") return null;
+
+            try {
+              return document.querySelector(id);
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean)
+      ),
+    ];
 
     if (!sections.length) return;
 
-    const observer =
-      new IntersectionObserver(
-        entries => {
-          entries.forEach(entry => {
-            if (!entry.isIntersecting) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
 
-            const id =
-              `#${entry.target.id}`;
+          const id = "#" + entry.target.id;
 
-            links.forEach(link => {
-              link.classList.toggle(
-                "active",
-                link.getAttribute("href") === id
-              );
-            });
+          links.forEach((link) => {
+            link.classList.toggle(
+              "active",
+              link.getAttribute("href") === id
+            );
           });
-        },
-        {
-          rootMargin:
-            "-25% 0px -60% 0px",
-          threshold: 0
-        }
-      );
-
-    sections.forEach(section =>
-      observer.observe(section)
+        });
+      },
+      {
+        rootMargin: "-25% 0px -60% 0px",
+        threshold: 0,
+      }
     );
+
+    sections.forEach((section) => observer.observe(section));
   }
 
-  /* =========================================================
-     SMOOTH ANCHORS
-     ========================================================= */
-
   function initSmoothAnchors() {
-    $$('a[href^="#"]').forEach(link => {
-      link.addEventListener("click", event => {
-        const targetId =
-          link.getAttribute("href");
+    $$('a[href^="#"]').forEach((link) => {
+      link.addEventListener("click", (event) => {
+        const id = link.getAttribute("href");
 
-        if (
-          !targetId ||
-          targetId === "#"
-        ) {
+        if (!id || id === "#") return;
+
+        let target;
+
+        try {
+          target = document.querySelector(id);
+        } catch {
           return;
         }
-
-        const target =
-          document.querySelector(targetId);
 
         if (!target) return;
 
         event.preventDefault();
 
         target.scrollIntoView({
-          behavior: prefersReducedMotion
-            ? "auto"
-            : "smooth",
-          block: "start"
+          behavior: prefersReducedMotion ? "auto" : "smooth",
+          block: "start",
         });
 
-        history.replaceState(
-          null,
-          "",
-          targetId
-        );
+        history.replaceState(null, "", id);
       });
     });
   }
 
-  /* =========================================================
-     SCROLL REVEAL
-     ========================================================= */
-
   function initRevealAnimations() {
-    const candidates = $$(
-      "section > div > *," +
-      "section article," +
-      "section blockquote," +
-      "section h2," +
-      "section h3"
+    const elements = $$(
+      "section > div > *, section article, section blockquote, section h2, section h3"
     );
 
-    if (!candidates.length) return;
+    if (!elements.length) return;
 
-    candidates.forEach((element, index) => {
-      if (
-        element.classList.contains("reveal")
-      ) {
-        return;
-      }
-
+    elements.forEach((element, index) => {
       element.classList.add("reveal");
 
-      const delay =
-        index % 5;
+      const delay = index % 5;
 
       if (delay > 0) {
-        element.classList.add(
-          `delay-${delay}`
-        );
+        element.classList.add("delay-" + delay);
+      }
+
+      if (prefersReducedMotion) {
+        element.classList.add("visible");
       }
     });
 
-    if (prefersReducedMotion) {
-      candidates.forEach(element =>
-        element.classList.add("visible")
-      );
-
+    if (
+      prefersReducedMotion ||
+      !("IntersectionObserver" in window)
+    ) {
       return;
     }
 
-    const observer =
-      new IntersectionObserver(
-        entries => {
-          entries.forEach(entry => {
-            if (!entry.isIntersecting) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
 
-            entry.target.classList.add(
-              "visible"
-            );
-
-            observer.unobserve(
-              entry.target
-            );
-          });
-        },
-        {
-          threshold: 0.08,
-          rootMargin:
-            "0px 0px -60px 0px"
-        }
-      );
-
-    candidates.forEach(element =>
-      observer.observe(element)
+          entry.target.classList.add("visible");
+          observer.unobserve(entry.target);
+        });
+      },
+      {
+        threshold: 0.08,
+        rootMargin: "0px 0px -60px 0px",
+      }
     );
-  }
 
-  /* =========================================================
-     CARD MOUSE GLOW
-     ========================================================= */
+    elements.forEach((element) => observer.observe(element));
+  }
 
   function initCardGlow() {
     const cards = $$(
-      "article," +
-      ".card," +
-      ".skill-card," +
-      ".experience-card," +
-      ".lab-card," +
-      ".certification-card"
+      "article, .card, .skill-card, .experience-card, .lab-card, .certification-card, .recommendation-card"
     );
 
-    cards.forEach(card => {
+    cards.forEach((card) => {
       card.addEventListener(
         "pointermove",
-        event => {
-          const rect =
-            card.getBoundingClientRect();
+        (event) => {
+          const rect = card.getBoundingClientRect();
+
+          if (!rect.width || !rect.height) return;
 
           const x =
-            ((event.clientX - rect.left) /
-              rect.width) *
-            100;
+            ((event.clientX - rect.left) / rect.width) * 100;
 
           const y =
-            ((event.clientY - rect.top) /
-              rect.height) *
-            100;
+            ((event.clientY - rect.top) / rect.height) * 100;
 
-          card.style.setProperty(
-            "--mouse-x",
-            `${x}%`
-          );
-
-          card.style.setProperty(
-            "--mouse-y",
-            `${y}%`
-          );
+          card.style.setProperty("--mouse-x", x + "%");
+          card.style.setProperty("--mouse-y", y + "%");
         },
         { passive: true }
       );
     });
   }
 
-  /* =========================================================
-     ANIMATED COUNTERS
-     ========================================================= */
-
   function initCounters() {
-    if (prefersReducedMotion) return;
-
-    const textNodes = [];
-
-    const walker =
-      document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_TEXT
-      );
-
-    while (walker.nextNode()) {
-      const node =
-        walker.currentNode;
-
-      if (!node.nodeValue.trim()) {
-        continue;
-      }
-
-      const text =
-        node.nodeValue.trim();
-
-      if (
-        /\d+\+/.test(text) ||
-        /\d+%/.test(text) ||
-        /\d+\.\d+\/\d+/.test(text)
-      ) {
-        textNodes.push(node);
-      }
+    if (
+      prefersReducedMotion ||
+      !("IntersectionObserver" in window)
+    ) {
+      return;
     }
 
-    textNodes.forEach(node => {
-      const original =
-        node.nodeValue;
-
-      const match =
-        original.match(
-          /^(\D*)(\d+(?:\.\d+)?)(\+|%|\/\d+)?(.*)$/
-        );
-
-      if (!match) return;
-
-      const prefix = match[1];
-      const value = Number(match[2]);
-      const suffix = match[3] || "";
-      const trailing = match[4] || "";
-
-      if (
-        value <= 0 ||
-        value > 1000
-      ) {
-        return;
-      }
-
-      const element =
-        document.createElement("span");
-
-      element.dataset.counter =
-        String(value);
-
-      element.textContent =
-        `${prefix}0${suffix}${trailing}`;
-
-      node.parentNode.replaceChild(
-        element,
-        node
-      );
-    });
-
-    const counters =
-      $$("[data-counter]");
+    const counters = $$("[data-count]");
 
     if (!counters.length) return;
 
-    const observer =
-      new IntersectionObserver(
-        entries => {
-          entries.forEach(entry => {
-            if (!entry.isIntersecting) {
-              return;
-            }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
 
-            animateCounter(
-              entry.target,
-              Number(
-                entry.target.dataset.counter
-              )
-            );
+          const element = entry.target;
+          const target = Number(element.dataset.count);
 
-            observer.unobserve(
-              entry.target
-            );
-          });
-        },
-        {
-          threshold: 0.6
-        }
-      );
+          if (!Number.isFinite(target)) {
+            observer.unobserve(element);
+            return;
+          }
 
-    counters.forEach(counter =>
-      observer.observe(counter)
+          animateCounter(element, target);
+          observer.unobserve(element);
+        });
+      },
+      { threshold: 0.5 }
     );
+
+    counters.forEach((counter) => observer.observe(counter));
   }
 
   function animateCounter(element, target) {
-    const duration = 1300;
+    const duration = 1400;
     const start = performance.now();
 
-    const original =
-      element.textContent;
+    const suffix = element.dataset.suffix || "";
 
-    const prefix =
-      original.match(/^\D*/)?.[0] || "";
+    const decimals = Math.max(
+      0,
+      Number(element.dataset.decimals || 0)
+    );
 
-    const suffix =
-      original.match(
-        /(\+|%|\/\d+)/
-      )?.[0] || "";
-
-    const trailing =
-      original.replace(
-        prefix,
-        ""
-      ).replace(
-        /^\d+(?:\.\d+)?/,
-        ""
+    const step = (now) => {
+      const progress = Math.min(
+        1,
+        (now - start) / duration
       );
 
-    const step = now => {
-      const progress =
-        Math.min(
-          1,
-          (now - start) /
-          duration
-        );
-
       const eased =
-        1 -
-        Math.pow(
-          1 - progress,
-          3
-        );
+        1 - Math.pow(1 - progress, 3);
 
-      const current =
-        target * eased;
-
-      let display;
-
-      if (
-        target % 1 !== 0
-      ) {
-        display =
-          current.toFixed(1);
-      } else {
-        display =
-          Math.round(current);
-      }
+      const value = target * eased;
 
       element.textContent =
-        `${prefix}${display}${suffix}${trailing}`;
+        value.toFixed(decimals) + suffix;
 
       if (progress < 1) {
         requestAnimationFrame(step);
+      } else {
+        element.textContent =
+          target.toFixed(decimals) + suffix;
       }
     };
 
     requestAnimationFrame(step);
   }
 
-  /* =========================================================
-     PARTICLE / NETWORK BACKGROUND
-     ========================================================= */
-
   function initBackground() {
-    if (prefersReducedMotion) {
-      return;
+    if (prefersReducedMotion) return;
+
+    let canvas = $("#particle-canvas");
+
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.id = "particle-canvas";
+      document.body.prepend(canvas);
     }
 
-    const canvas =
-      document.createElement("canvas");
-
-    canvas.id =
-      "particle-canvas";
-
-    document.body.prepend(canvas);
-
-    const ctx =
-      canvas.getContext("2d", {
-        alpha: true
-      });
+    const ctx = canvas.getContext("2d", {
+      alpha: true,
+    });
 
     if (!ctx) return;
 
     let width = 0;
     let height = 0;
     let dpr = 1;
-
     let particles = [];
 
     const mouse = {
       x: null,
       y: null,
-      radius: 150
+      radius: 150,
     };
 
     const config = {
@@ -579,66 +358,13 @@
       maxParticles: 95,
       connectionDistance: 145,
       mouseDistance: 190,
-      speed: 0.25
+      speed: 0.25,
     };
-
-    function resize() {
-      dpr =
-        Math.min(
-          window.devicePixelRatio || 1,
-          2
-        );
-
-      width =
-        window.innerWidth;
-
-      height =
-        window.innerHeight;
-
-      canvas.width =
-        width * dpr;
-
-      canvas.height =
-        height * dpr;
-
-      canvas.style.width =
-        `${width}px`;
-
-      canvas.style.height =
-        `${height}px`;
-
-      ctx.setTransform(
-        dpr,
-        0,
-        0,
-        dpr,
-        0,
-        0
-      );
-
-      const calculated =
-        Math.floor(
-          width *
-          height *
-          config.density
-        );
-
-      const count =
-        Math.min(
-          config.maxParticles,
-          Math.max(
-            config.minParticles,
-            calculated
-          )
-        );
-
-      createParticles(count);
-    }
 
     function createParticles(count) {
       particles = [];
 
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < count; i += 1) {
         particles.push({
           x: Math.random() * width,
           y: Math.random() * height,
@@ -662,9 +388,50 @@
           hue:
             Math.random() > 0.75
               ? 190
-              : 205
+              : 205,
         });
       }
+    }
+
+    function resize() {
+      dpr = Math.min(
+        window.devicePixelRatio || 1,
+        2
+      );
+
+      width = window.innerWidth;
+      height = window.innerHeight;
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+
+      ctx.setTransform(
+        dpr,
+        0,
+        0,
+        dpr,
+        0,
+        0
+      );
+
+      const calculated = Math.floor(
+        width *
+        height *
+        config.density
+      );
+
+      const count = Math.min(
+        config.maxParticles,
+        Math.max(
+          config.minParticles,
+          calculated
+        )
+      );
+
+      createParticles(count);
     }
 
     function updateParticle(particle) {
@@ -698,18 +465,11 @@
           particle.y - mouse.y;
 
         const distance =
-          Math.sqrt(
-            dx * dx +
-            dy * dy
-          );
+          Math.hypot(dx, dy);
 
-        if (
-          distance <
-          mouse.radius
-        ) {
+        if (distance < mouse.radius) {
           const force =
-            (mouse.radius -
-              distance) /
+            (mouse.radius - distance) /
             mouse.radius;
 
           particle.x +=
@@ -737,7 +497,11 @@
       );
 
       ctx.fillStyle =
-        `hsla(${particle.hue}, 90%, 70%, ${particle.alpha})`;
+        "hsla(" +
+        particle.hue +
+        ", 90%, 70%, " +
+        particle.alpha +
+        ")";
 
       ctx.fill();
     }
@@ -746,30 +510,21 @@
       for (
         let i = 0;
         i < particles.length;
-        i++
+        i += 1
       ) {
         for (
           let j = i + 1;
           j < particles.length;
-          j++
+          j += 1
         ) {
-          const a =
-            particles[i];
+          const a = particles[i];
+          const b = particles[j];
 
-          const b =
-            particles[j];
-
-          const dx =
-            a.x - b.x;
-
-          const dy =
-            a.y - b.y;
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
 
           const distance =
-            Math.sqrt(
-              dx * dx +
-              dy * dy
-            );
+            Math.hypot(dx, dy);
 
           if (
             distance >
@@ -781,26 +536,20 @@
           const alpha =
             (1 -
               distance /
-              config.connectionDistance) *
+                config.connectionDistance) *
             0.13;
 
           ctx.beginPath();
 
-          ctx.moveTo(
-            a.x,
-            a.y
-          );
-
-          ctx.lineTo(
-            b.x,
-            b.y
-          );
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
 
           ctx.strokeStyle =
-            `rgba(56, 189, 248, ${alpha})`;
+            "rgba(56, 189, 248, " +
+            alpha +
+            ")";
 
           ctx.lineWidth = 0.65;
-
           ctx.stroke();
         }
       }
@@ -814,20 +563,15 @@
         return;
       }
 
-      particles.forEach(particle => {
+      particles.forEach((particle) => {
         const dx =
-          particle.x -
-          mouse.x;
+          particle.x - mouse.x;
 
         const dy =
-          particle.y -
-          mouse.y;
+          particle.y - mouse.y;
 
         const distance =
-          Math.sqrt(
-            dx * dx +
-            dy * dy
-          );
+          Math.hypot(dx, dy);
 
         if (
           distance >
@@ -839,7 +583,7 @@
         const alpha =
           (1 -
             distance /
-            config.mouseDistance) *
+              config.mouseDistance) *
           0.26;
 
         ctx.beginPath();
@@ -855,10 +599,11 @@
         );
 
         ctx.strokeStyle =
-          `rgba(34, 211, 238, ${alpha})`;
+          "rgba(34, 211, 238, " +
+          alpha +
+          ")";
 
         ctx.lineWidth = 0.8;
-
         ctx.stroke();
       });
     }
@@ -871,21 +616,12 @@
         height
       );
 
-      particles.forEach(
-        updateParticle
-      );
-
+      particles.forEach(updateParticle);
       drawConnections();
-
-      particles.forEach(
-        drawParticle
-      );
-
+      particles.forEach(drawParticle);
       drawMouseConnections();
 
-      requestAnimationFrame(
-        animate
-      );
+      requestAnimationFrame(animate);
     }
 
     window.addEventListener(
@@ -896,18 +632,15 @@
 
     window.addEventListener(
       "pointermove",
-      event => {
-        mouse.x =
-          event.clientX;
-
-        mouse.y =
-          event.clientY;
+      (event) => {
+        mouse.x = event.clientX;
+        mouse.y = event.clientY;
       },
       { passive: true }
     );
 
     window.addEventListener(
-      "pointerleave",
+      "blur",
       () => {
         mouse.x = null;
         mouse.y = null;
@@ -919,19 +652,18 @@
     animate();
   }
 
-  /* =========================================================
-     FLOATING ORBS
-     ========================================================= */
-
   function initFloatingOrbs() {
-    if (prefersReducedMotion) return;
+    if (
+      prefersReducedMotion ||
+      $(".glow-orb")
+    ) {
+      return;
+    }
 
     const orb1 =
       document.createElement("div");
 
-    orb1.className =
-      "glow-orb";
-
+    orb1.className = "glow-orb";
     orb1.style.top = "18%";
     orb1.style.left = "5%";
 
@@ -940,9 +672,7 @@
     const orb2 =
       document.createElement("div");
 
-    orb2.className =
-      "glow-orb";
-
+    orb2.className = "glow-orb";
     orb2.style.width = "160px";
     orb2.style.height = "160px";
     orb2.style.right = "8%";
@@ -952,45 +682,29 @@
     document.body.appendChild(orb2);
   }
 
-  /* =========================================================
-     SCANLINE
-     ========================================================= */
-
   function initScanline() {
-    if (prefersReducedMotion) {
+    if (
+      prefersReducedMotion ||
+      $(".scanline")
+    ) {
       return;
     }
 
     const scanline =
       document.createElement("div");
 
-    scanline.className =
-      "scanline";
+    scanline.className = "scanline";
 
-    document.body.appendChild(
-      scanline
-    );
+    document.body.appendChild(scanline);
   }
-
-  /* =========================================================
-     PAGE VISIBILITY
-     ========================================================= */
 
   document.addEventListener(
     "visibilitychange",
     () => {
-      if (
+      document.body.classList.toggle(
+        "page-hidden",
         document.hidden
-      ) {
-        document.body.classList.add(
-          "page-hidden"
-        );
-      } else {
-        document.body.classList.remove(
-          "page-hidden"
-        );
-      }
+      );
     }
   );
-
 })();
