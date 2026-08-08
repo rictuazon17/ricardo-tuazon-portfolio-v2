@@ -1394,3 +1394,82 @@ html[data-theme="light"] .recommendation-card {
     border: 1px solid #ddd;
   }
 }
+@media (max-width: 900px) {
+  .mobile-menu-toggle {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 44px;
+    height: 44px;
+    padding: 8px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    z-index: 1001;
+  }
+
+  .mobile-menu-toggle .hamburger {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 2px;
+    transition: transform 0.2s ease,
+                opacity 0.2s ease;
+  }
+
+  .primary-nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+
+    display: none;
+
+    padding: 1rem;
+
+    background: var(--bg-primary, #0a0e1a);
+    border-top: 1px solid
+      rgba(255, 255, 255, 0.08);
+
+    box-shadow:
+      0 15px 40px
+      rgba(0, 0, 0, 0.35);
+  }
+
+  .primary-nav.is-open {
+    display: block;
+  }
+
+  .nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nav-link {
+    display: block;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+  }
+
+  .nav-link:hover,
+  .nav-link.active {
+    background: rgba(56, 189, 248, 0.1);
+    color: #38bdf8;
+  }
+
+  body.nav-open {
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 901px) {
+  .mobile-menu-toggle {
+    display: none;
+  }
+}
