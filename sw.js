@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v5-hotfix";
+const CACHE_VERSION = "v6-hotfix";
 const CACHE_NAME = `ricardo-portfolio-${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -58,10 +58,13 @@ async function injectHotfixes(response) {
   if (!type.includes("text/html")) return response;
 
   const original = await response.text();
-  const cleaned = original.replace(/^\s*```(?:html)?\s*$/gm, "");
+  const cleaned = original
+    .replace(/^\s*```(?:html)?\s*$/gim, "")
+    .replace(/^\s*```\s*$/gim, "");
+
   const injected = cleaned.replace(
     /<\/head>/i,
-    '  <link rel="stylesheet" href="/hotfix.css?v=5"><script src="/hotfix.js?v=5" defer></script>\n</head>'
+    '  <link rel="stylesheet" href="/hotfix.css?v=6"><script src="/hotfix.js?v=6" defer></script>\n</head>'
   );
 
   const headers = new Headers(response.headers);
