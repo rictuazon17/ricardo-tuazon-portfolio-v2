@@ -1,0 +1,8 @@
+/* Remove the terminal/status graphic from the hero as requested. */
+.terminal-card,
+.hero-visual .terminal-card {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
