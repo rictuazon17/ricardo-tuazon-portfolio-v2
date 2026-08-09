@@ -1,10 +1,11 @@
-const CACHE_VERSION = "v8-clean-runtime";
+const CACHE_VERSION = "v9-visual-restoration";
 const CACHE_NAME = `ricardo-portfolio-${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
   "/",
   "/index.html",
   "/script.js",
+  "/visual-fix.js",
   "/assets/css/design-system.css",
   "/assets/css/style.css",
   "/manifest.json",
@@ -15,7 +16,6 @@ const CORE_ASSETS = [
 
 const OPTIONAL_ASSETS = [
   "/og-image.jpg",
-  "/profile.jpg",
   "/Ricardo-Tuazon-Jr.pdf",
   "/Recommendation%20Letter.pdf"
 ];
@@ -53,6 +53,36 @@ function isNavigation(request) {
   return request.mode === "navigate" || request.destination === "document";
 }
 
+async function injectVisualFix(response) {
+  if (!response || !response.ok) return response;
+  const type = response.headers.get("content-type") || "";
+  if (!type.includes("text/html")) return response;
+
+  const original = await response.text();
+  const cleaned = original
+    .replace(/^\s*```(?:html)?\s*$/gim, "")
+    .replace(/^\s*```\s*$/gim, "");
+
+  if (cleaned.includes('/visual-fix.js')) {
+    return new Response(cleaned, { status: response.status, statusText: response.statusText, headers: response.headers });
+  }
+
+  const injected = cleaned.replace(
+    /<\/head>/i,
+    '  <script src="/visual-fix.js?v=9" defer></script>\n</head>'
+  );
+
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.delete("content-length");
+
+  return new Response(injected, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -63,6 +93,7 @@ self.addEventListener("fetch", event => {
   if (isNavigation(request)) {
     event.respondWith(
       fetch(request, { cache: "no-store" })
+        .then(injectVisualFix)
         .then(response => {
           if (response && response.ok) {
             const copy = response.clone();
