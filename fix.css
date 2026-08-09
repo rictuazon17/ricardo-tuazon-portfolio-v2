@@ -41,6 +41,14 @@ body::after{
   }
 }
 
+/* Remove the theme toggle from the production UI. */
+.theme-toggle,
+#theme-toggle{
+  display:none!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+
 /* Profile photo: use the repository-local image and make it prominent. */
 .hero-avatar{
   position:relative!important;
