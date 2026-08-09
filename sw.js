@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v6-hotfix";
+const CACHE_VERSION = "v7-production-fix";
 const CACHE_NAME = `ricardo-portfolio-${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -8,13 +8,20 @@ const CORE_ASSETS = [
   "/script.js",
   "/hotfix.css",
   "/hotfix.js",
+  "/assets/css/design-system.css",
+  "/assets/css/style.css",
+  "/assets/js/nav.js",
+  "/assets/js/home.js",
+  "/assets/js/script.js",
   "/manifest.json",
-  "/profile.jpg",
+  "/favicon.ico",
   "/icons/icon-192.png",
   "/icons/icon-512.png"
 ];
 
 const OPTIONAL_ASSETS = [
+  "/og-image.jpg",
+  "/profile.jpg",
   "/Ricardo-Tuazon-Jr.pdf",
   "/Recommendation%20Letter.pdf"
 ];
@@ -28,7 +35,7 @@ self.addEventListener("install", event => {
             try {
               const response = await fetch(url, { cache: "no-cache" });
               if (response.ok) await cache.put(url, response);
-            } catch {}
+            } catch (_) {}
           })
         );
       })
@@ -64,12 +71,13 @@ async function injectHotfixes(response) {
 
   const injected = cleaned.replace(
     /<\/head>/i,
-    '  <link rel="stylesheet" href="/hotfix.css?v=6"><script src="/hotfix.js?v=6" defer></script>\n</head>'
+    '  <link rel="stylesheet" href="/hotfix.css?v=7"><script src="/hotfix.js?v=7" defer></script>\n</head>'
   );
 
   const headers = new Headers(response.headers);
   headers.set("content-type", "text/html; charset=utf-8");
   headers.delete("content-length");
+
   return new Response(injected, {
     status: response.status,
     statusText: response.statusText,
@@ -111,6 +119,7 @@ self.addEventListener("fetch", event => {
           return response;
         })
         .catch(() => cached);
+
       return cached || refresh;
     })
   );
