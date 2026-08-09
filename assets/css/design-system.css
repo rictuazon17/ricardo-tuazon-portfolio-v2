@@ -1,3 +1,4 @@
 /* Compatibility entry point for the production portfolio stylesheet. */
 @import url("/style.css");
 @import url("/fix.css");
+@import url("/remove-terminal-card.css");
