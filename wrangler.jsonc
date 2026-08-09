@@ -3,12 +3,7 @@
   "name": "ricardo-tuazon-portfolio-v2",
   "compatibility_date": "2026-08-09",
   "assets": {
-    "directory": ".",
-    "exclude": [
-      ".git/**",
-      ".wrangler/**",
-      "node_modules/**"
-    ]
+    "directory": "."
   },
   "observability": {
     "enabled": true
